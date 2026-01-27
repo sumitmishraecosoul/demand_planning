@@ -339,7 +339,20 @@ exports.getUsers = async (req, res) => {
     const { department, role } = req.query;
     
     const filter = { isActive: true };
-    if (department) filter.department = department;
+    
+    // If department filter is provided, include:
+    // 1. Regular users whose department matches
+    // 2. Directors who have this department in accessibleDepartments
+    if (department) {
+      filter.$or = [
+        { department: department }, // Regular users
+        { 
+          role: 'director',
+          accessibleDepartments: department // Directors with access
+        }
+      ];
+    }
+    
     if (role) filter.role = role;
 
     const users = await User.find(filter)

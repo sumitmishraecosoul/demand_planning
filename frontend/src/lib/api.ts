@@ -176,12 +176,20 @@ export const fileAPI = {
 export const workflowAPI = {
   passToNextLevel: (fileId: string, data: any) =>
     api.post(`/workflow/files/${fileId}/pass`, data),
+  passToSameLevel: (fileId: string, data: any) =>
+    api.post(`/workflow/files/${fileId}/pass-same-level`, data),
+  completeFile: (fileId: string, data: any) =>
+    api.post(`/workflow/files/${fileId}/complete`, data),
   rejectFile: (fileId: string, data: any) =>
     api.post(`/workflow/files/${fileId}/reject`, data),
   getWorkflow: (fileId: string) => api.get(`/workflow/files/${fileId}`),
-  getDepartmentUsers: (departmentId: string, excludeMe?: boolean) =>
+  getDepartmentUsers: (departmentId: string, excludeMe?: boolean, currentLevelId?: string) =>
     api.get(`/workflow/departments/${departmentId}/users`, {
-      params: { excludeMe },
+      params: { excludeMe, currentLevelId },
+    }),
+  getSameLevelUsers: (levelId: string, excludeUserId: string) =>
+    api.get(`/workflow/levels/${levelId}/users`, {
+      params: { excludeUserId },
     }),
 };
 

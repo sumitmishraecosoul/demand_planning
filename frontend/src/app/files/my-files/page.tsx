@@ -21,9 +21,11 @@ export default function MyFilesPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
   const [showWorkflow, setShowWorkflow] = useState(false);
-  const [actionType, setActionType] = useState<'pass' | 'reject' | 'update'>('pass');
+  const [actionType, setActionType] = useState<'pass' | 'reject' | 'update' | 'complete' | 'passToSameLevel'>('pass');
   const [departmentUsers, setDepartmentUsers] = useState<any[]>([]);
+  const [sameLevelUsers, setSameLevelUsers] = useState<any[]>([]);
   const [selectedNextHandlers, setSelectedNextHandlers] = useState<string[]>([]);
+  const [isLastLevel, setIsLastLevel] = useState(false);
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
@@ -42,19 +44,40 @@ export default function MyFilesPage() {
     }
   };
 
-  const fetchDepartmentUsers = async (departmentId: string) => {
+  const fetchDepartmentUsers = async (departmentId: string, currentLevelId?: string, file?: any) => {
     try {
-      const response = await workflowAPI.getDepartmentUsers(departmentId, true);
-      setDepartmentUsers(response.data.users);
+      const response = await workflowAPI.getDepartmentUsers(departmentId, true, currentLevelId);
+      const nextLevelUsers = response.data.users || [];
+      const isLast = !response.data.nextLevel || nextLevelUsers.length === 0;
+      
+      setDepartmentUsers(nextLevelUsers);
+      setIsLastLevel(isLast);
+      
+      // If last level, fetch users at SAME level (excluding current user)
+      if (isLast && file) {
+        try {
+          const sameLevelResponse = await workflowAPI.getSameLevelUsers(
+            file.currentLevel._id, 
+            file.currentHandler._id
+          );
+          setSameLevelUsers(sameLevelResponse.data.users || []);
+        } catch (error) {
+          console.error('Error fetching same level users:', error);
+          setSameLevelUsers([]);
+        }
+      } else {
+        setSameLevelUsers([]);
+      }
     } catch (error) {
       console.error('Error fetching department users:', error);
+      toast.error('Failed to fetch users');
     }
   };
 
   const handlePassFile = async (file: any) => {
     setSelectedFile(file);
     setActionType('pass');
-    await fetchDepartmentUsers(file.department._id);
+    await fetchDepartmentUsers(file.department._id, file.currentLevel._id, file);
     setShowSignature(true);
   };
 
@@ -92,7 +115,8 @@ export default function MyFilesPage() {
   };
 
   const handleSubmitAction = async (signature: string, comments: string) => {
-    if (actionType === 'pass' && selectedNextHandlers.length === 0) {
+    // Validation for pass and passToSameLevel
+    if ((actionType === 'pass' || actionType === 'passToSameLevel') && selectedNextHandlers.length === 0) {
       toast.error('Please select at least one handler');
       return;
     }
@@ -102,9 +126,27 @@ export default function MyFilesPage() {
       if (actionType === 'reject') {
         await workflowAPI.rejectFile(selectedFile._id, { signature, comments });
         toast.success('File rejected successfully');
+      } else if (actionType === 'complete') {
+        // Complete the workflow at final level
+        await workflowAPI.completeFile(selectedFile._id, { signature, comments });
+        toast.success('File completed successfully! Workflow is now closed.');
+      } else if (actionType === 'passToSameLevel') {
+        // Pass to another handler at the same level
+        const nextHandler = selectedNextHandlers.length === 1 
+          ? selectedNextHandlers[0] 
+          : selectedNextHandlers;
+          
+        await workflowAPI.passToSameLevel(selectedFile._id, {
+          nextHandler,
+          signature,
+          comments,
+        });
+        const handlerText = selectedNextHandlers.length > 1 
+          ? `${selectedNextHandlers.length} handlers at same level` 
+          : 'same level handler';
+        toast.success(`File passed to ${handlerText} successfully`);
       } else {
-        // If single handler selected, send as string for backward compatibility
-        // If multiple handlers, send as array
+        // Regular pass to next level
         const nextHandler = selectedNextHandlers.length === 1 
           ? selectedNextHandlers[0] 
           : selectedNextHandlers;
@@ -305,7 +347,13 @@ export default function MyFilesPage() {
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b">
                   <h2 className="text-xl font-bold text-gray-900">
-                    {actionType === 'reject' ? 'Reject File' : 'Pass to Next Level'}
+                    {actionType === 'reject' 
+                      ? 'Reject File' 
+                      : actionType === 'complete'
+                      ? 'Complete Workflow'
+                      : actionType === 'passToSameLevel'
+                      ? 'Pass to Same Level Handler'
+                      : 'Pass to Next Level'}
                   </h2>
                   <button
                     onClick={() => {
@@ -328,8 +376,40 @@ export default function MyFilesPage() {
                   const comments = formData.get('comments') as string;
                   handleSubmitAction(signature, comments);
                 }} className="p-6 space-y-4">
-                  {/* Next Handler Selection (only for pass action) */}
-                  {actionType === 'pass' && (
+                  {/* Action Selection for Last Level */}
+                  {isLastLevel && actionType === 'pass' && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
+                      <p className="text-sm font-medium text-yellow-900">
+                        🎯 This is the final level. What would you like to do?
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActionType('complete')}
+                          className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                        >
+                          ✓ Complete Workflow
+                        </button>
+                        {sameLevelUsers.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setActionType('passToSameLevel')}
+                            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          >
+                            → Pass to Same Level
+                          </button>
+                        )}
+                      </div>
+                      {sameLevelUsers.length === 0 && (
+                        <p className="text-xs text-yellow-700">
+                          No other handlers at this level. You can only complete the workflow.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Next Handler Selection (for pass to next level) */}
+                  {actionType === 'pass' && !isLastLevel && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Select Next Handler(s) <span className="text-red-500">*</span>
@@ -370,8 +450,75 @@ export default function MyFilesPage() {
                     </div>
                   )}
 
+                  {/* Same Level Handler Selection */}
+                  {actionType === 'passToSameLevel' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Same Level Handler(s) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                        {sameLevelUsers.length === 0 ? (
+                          <p className="text-sm text-gray-500">No other users at this level</p>
+                        ) : (
+                          sameLevelUsers.map((u) => (
+                            <label key={u._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedNextHandlers.includes(u._id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedNextHandlers([...selectedNextHandlers, u._id]);
+                                  } else {
+                                    setSelectedNextHandlers(selectedNextHandlers.filter(h => h !== u._id));
+                                  }
+                                }}
+                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                              />
+                              <span className="text-sm text-gray-700">
+                                {u.name} - {u.designation} {u.level && `(Level ${u.level})`}
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      {selectedNextHandlers.length > 0 && (
+                        <p className="mt-2 text-xs text-primary-600">
+                          {selectedNextHandlers.length} handler(s) selected
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-500">
+                        Pass to another reviewer at the same level
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Complete Action Info */}
+                  {actionType === 'complete' && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <p className="text-sm font-medium text-green-900 leading-relaxed">
+                        ✓ You are about to complete this workflow. The file will be marked as completed and no further action will be required.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setActionType('pass')}
+                        className="mt-3 text-sm text-green-700 hover:text-green-800 underline"
+                      >
+                        ← Go back to choose different action
+                      </button>
+                    </div>
+                  )}
+
                   {/* Declaration Statement */}
-                  {actionType === 'pass' && (
+                  {(actionType === 'pass' || actionType === 'passToSameLevel' || actionType === 'complete') && !isLastLevel && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm font-medium text-blue-900 leading-relaxed">
+                        {getDeclarationText()}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Declaration for Complete or Same Level */}
+                  {(actionType === 'complete' || (actionType === 'passToSameLevel' && isLastLevel)) && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <p className="text-sm font-medium text-blue-900 leading-relaxed">
                         {getDeclarationText()}
@@ -437,7 +584,11 @@ export default function MyFilesPage() {
                       {updating 
                         ? 'Processing...' 
                         : actionType === 'reject' 
-                          ? 'Reject File' 
+                          ? 'Reject File'
+                          : actionType === 'complete'
+                          ? 'Complete Workflow'
+                          : actionType === 'passToSameLevel'
+                          ? 'Pass to Same Level'
                           : 'Pass to Next Level'
                       }
                     </button>
