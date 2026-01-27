@@ -76,7 +76,8 @@ exports.createLevels = async (req, res) => {
         levelNumber: i + 1,
         levelName: levels[i].levelName,
         description: levels[i].description,
-        defaultHandler: levels[i].defaultHandler,
+        handlers: levels[i].handlers || [], // Support multiple handlers
+        defaultHandler: levels[i].defaultHandler || (levels[i].handlers && levels[i].handlers[0]), // Backward compatibility
         nextLevel: null
       });
 
@@ -114,6 +115,7 @@ exports.getLevelsByDepartment = async (req, res) => {
       department: departmentId, 
       isActive: true 
     })
+    .populate('handlers', 'name email designation')
     .populate('defaultHandler', 'name email designation')
     .populate('nextLevel', 'levelName levelNumber')
     .sort({ levelNumber: 1 });
@@ -135,7 +137,7 @@ exports.getLevelsByDepartment = async (req, res) => {
 // Add a single level to a department
 exports.addLevel = async (req, res) => {
   try {
-    const { departmentId, levelName, description, defaultHandler } = req.body;
+    const { departmentId, levelName, description, defaultHandler, handlers } = req.body;
 
     // Validate department
     const department = await Department.findById(departmentId);
@@ -158,7 +160,8 @@ exports.addLevel = async (req, res) => {
       levelNumber: newLevelNumber,
       levelName,
       description,
-      defaultHandler: defaultHandler || null,
+      handlers: handlers || [],
+      defaultHandler: defaultHandler || (handlers && handlers[0]) || null,
       nextLevel: null
     });
 
@@ -169,6 +172,7 @@ exports.addLevel = async (req, res) => {
     }
 
     const populatedLevel = await Level.findById(newLevel._id)
+      .populate('handlers', 'name email designation')
       .populate('defaultHandler', 'name email designation')
       .populate('nextLevel', 'levelName levelNumber');
 
@@ -191,7 +195,7 @@ exports.addLevel = async (req, res) => {
 exports.updateLevel = async (req, res) => {
   try {
     const { levelId } = req.params;
-    const { levelName, description, defaultHandler } = req.body;
+    const { levelName, description, defaultHandler, handlers } = req.body;
 
     const level = await Level.findById(levelId);
     if (!level) {
@@ -204,11 +208,17 @@ exports.updateLevel = async (req, res) => {
     // Update level fields
     if (levelName) level.levelName = levelName;
     if (description !== undefined) level.description = description;
-    if (defaultHandler !== undefined) level.defaultHandler = defaultHandler || null;
+    if (handlers !== undefined) {
+      level.handlers = handlers;
+      level.defaultHandler = handlers && handlers[0] ? handlers[0] : null;
+    } else if (defaultHandler !== undefined) {
+      level.defaultHandler = defaultHandler || null;
+    }
 
     await level.save();
 
     const populatedLevel = await Level.findById(level._id)
+      .populate('handlers', 'name email designation')
       .populate('defaultHandler', 'name email designation')
       .populate('nextLevel', 'levelName levelNumber');
 
@@ -268,7 +278,7 @@ exports.deleteLevel = async (req, res) => {
 // Create user/employee
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, password, role, department, level, designation, accessibleDepartments } = req.body;
+    const { name, email, password, role, department, level, designation, accessibleDepartments, departmentAssignments } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -295,6 +305,7 @@ exports.createUser = async (req, res) => {
       userData.department = department;
       userData.designation = designation;
       userData.accessibleDepartments = accessibleDepartments || [department];
+      userData.departmentAssignments = departmentAssignments || [];
     }
 
     const user = await User.create(userData);
@@ -335,6 +346,14 @@ exports.getUsers = async (req, res) => {
       .select('-password')
       .populate('department', 'name')
       .populate('accessibleDepartments', 'name')
+      .populate({
+        path: 'departmentAssignments.department',
+        select: 'name'
+      })
+      .populate({
+        path: 'departmentAssignments.level',
+        select: 'levelName levelNumber'
+      })
       .sort({ createdAt: -1 });
 
     res.json({
@@ -364,7 +383,17 @@ exports.updateUser = async (req, res) => {
       userId,
       updates,
       { new: true, runValidators: true }
-    ).select('-password').populate('department');
+    ).select('-password')
+    .populate('department')
+    .populate('accessibleDepartments')
+    .populate({
+      path: 'departmentAssignments.department',
+      select: 'name'
+    })
+    .populate({
+      path: 'departmentAssignments.level',
+      select: 'levelName levelNumber'
+    });
 
     if (!user) {
       return res.status(404).json({ 

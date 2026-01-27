@@ -19,7 +19,12 @@ const levelSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  // The user assigned as default handler for this level
+  // Multiple users assigned as handlers for this level
+  handlers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  // Keep defaultHandler for backward compatibility (deprecated)
   defaultHandler: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'

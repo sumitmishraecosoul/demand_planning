@@ -23,7 +23,7 @@ export default function MyFilesPage() {
   const [showWorkflow, setShowWorkflow] = useState(false);
   const [actionType, setActionType] = useState<'pass' | 'reject' | 'update'>('pass');
   const [departmentUsers, setDepartmentUsers] = useState<any[]>([]);
-  const [selectedNextHandler, setSelectedNextHandler] = useState('');
+  const [selectedNextHandlers, setSelectedNextHandlers] = useState<string[]>([]);
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
@@ -92,8 +92,8 @@ export default function MyFilesPage() {
   };
 
   const handleSubmitAction = async (signature: string, comments: string) => {
-    if (actionType === 'pass' && !selectedNextHandler) {
-      toast.error('Please select the next handler');
+    if (actionType === 'pass' && selectedNextHandlers.length === 0) {
+      toast.error('Please select at least one handler');
       return;
     }
 
@@ -103,18 +103,27 @@ export default function MyFilesPage() {
         await workflowAPI.rejectFile(selectedFile._id, { signature, comments });
         toast.success('File rejected successfully');
       } else {
+        // If single handler selected, send as string for backward compatibility
+        // If multiple handlers, send as array
+        const nextHandler = selectedNextHandlers.length === 1 
+          ? selectedNextHandlers[0] 
+          : selectedNextHandlers;
+          
         await workflowAPI.passToNextLevel(selectedFile._id, {
-          nextHandler: selectedNextHandler,
+          nextHandler,
           signature,
           comments,
           action: 'passed',
         });
-        toast.success('File passed to next level successfully');
+        const handlerText = selectedNextHandlers.length > 1 
+          ? `${selectedNextHandlers.length} handlers` 
+          : 'next level';
+        toast.success(`File passed to ${handlerText} successfully`);
       }
       
       setShowSignature(false);
       setSelectedFile(null);
-      setSelectedNextHandler('');
+      setSelectedNextHandlers([]);
       fetchMyFiles();
     } catch (error: any) {
       console.error('Error processing file:', error);
@@ -302,7 +311,7 @@ export default function MyFilesPage() {
                     onClick={() => {
                       setShowSignature(false);
                       setSelectedFile(null);
-                      setSelectedNextHandler('');
+                      setSelectedNextHandlers([]);
                     }}
                     className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
                     disabled={updating}
@@ -323,21 +332,41 @@ export default function MyFilesPage() {
                   {actionType === 'pass' && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Next Handler <span className="text-red-500">*</span>
+                        Select Next Handler(s) <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={selectedNextHandler}
-                        onChange={(e) => setSelectedNextHandler(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Select a person...</option>
-                        {departmentUsers.map((u) => (
-                          <option key={u._id} value={u._id}>
-                            {u.name} - {u.designation} (Level {u.level})
-                          </option>
-                        ))}
-                      </select>
+                      <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                        {departmentUsers.length === 0 ? (
+                          <p className="text-sm text-gray-500">No users available at the next level</p>
+                        ) : (
+                          departmentUsers.map((u) => (
+                            <label key={u._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedNextHandlers.includes(u._id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedNextHandlers([...selectedNextHandlers, u._id]);
+                                  } else {
+                                    setSelectedNextHandlers(selectedNextHandlers.filter(h => h !== u._id));
+                                  }
+                                }}
+                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                              />
+                              <span className="text-sm text-gray-700">
+                                {u.name} - {u.designation} {u.level && `(Level ${u.level})`}
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      {selectedNextHandlers.length > 0 && (
+                        <p className="mt-2 text-xs text-primary-600">
+                          {selectedNextHandlers.length} handler(s) selected
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-500">
+                        Select one or multiple handlers at the next level
+                      </p>
                     </div>
                   )}
 
@@ -389,7 +418,7 @@ export default function MyFilesPage() {
                       onClick={() => {
                         setShowSignature(false);
                         setSelectedFile(null);
-                        setSelectedNextHandler('');
+                        setSelectedNextHandlers([]);
                       }}
                       className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                       disabled={updating}

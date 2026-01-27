@@ -119,6 +119,7 @@ exports.uploadFile = async (req, res) => {
 exports.getFiles = async (req, res) => {
   try {
     const { department, status, myFiles } = req.query;
+    const Workflow = require('../models/Workflow.model');
     
     let filter = { isActive: true };
 
@@ -143,7 +144,24 @@ exports.getFiles = async (req, res) => {
 
     // Filter by current handler (my files)
     if (myFiles === 'true') {
-      filter.currentHandler = req.user._id;
+      // Find workflows where user is in assignedHandlers of the latest step
+      const workflows = await Workflow.find({
+        status: 'active'
+      }).select('file steps');
+
+      const fileIdsWithUser = workflows
+        .filter(w => {
+          const lastStep = w.steps[w.steps.length - 1];
+          return lastStep && lastStep.assignedHandlers && 
+                 lastStep.assignedHandlers.some(h => h.toString() === req.user._id.toString());
+        })
+        .map(w => w.file);
+
+      // Include files where user is currentHandler OR in assignedHandlers
+      filter.$or = [
+        { currentHandler: req.user._id },
+        { _id: { $in: fileIdsWithUser } }
+      ];
     }
 
     const files = await File.find(filter)

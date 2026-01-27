@@ -28,7 +28,10 @@ export default function UsersPage() {
     level: 1,
     designation: '',
     accessibleDepartments: [] as string[],
+    departmentAssignments: [] as Array<{ department: string; level: string }>,
   });
+
+  const [availableLevels, setAvailableLevels] = useState<any>({});
 
   useEffect(() => {
     fetchUsers();
@@ -54,6 +57,51 @@ export default function UsersPage() {
     } catch (error) {
       console.error('Error fetching departments:', error);
     }
+  };
+
+  const fetchLevelsForDepartment = async (deptId: string) => {
+    try {
+      const response = await adminAPI.getLevelsByDepartment(deptId);
+      setAvailableLevels((prev: any) => ({
+        ...prev,
+        [deptId]: response.data.levels,
+      }));
+    } catch (error) {
+      console.error('Error fetching levels:', error);
+    }
+  };
+
+  const addDepartmentAssignment = () => {
+    if (formData.accessibleDepartments.length === 0) {
+      toast.error('Please select at least one accessible department first');
+      return;
+    }
+    setFormData({
+      ...formData,
+      departmentAssignments: [
+        ...formData.departmentAssignments,
+        { department: '', level: '' },
+      ],
+    });
+  };
+
+  const updateDepartmentAssignment = (index: number, field: 'department' | 'level', value: string) => {
+    const newAssignments = [...formData.departmentAssignments];
+    newAssignments[index][field] = value;
+    
+    // If department changed, fetch levels for it
+    if (field === 'department' && value && !availableLevels[value]) {
+      fetchLevelsForDepartment(value);
+    }
+    
+    setFormData({ ...formData, departmentAssignments: newAssignments });
+  };
+
+  const removeDepartmentAssignment = (index: number) => {
+    setFormData({
+      ...formData,
+      departmentAssignments: formData.departmentAssignments.filter((_, i) => i !== index),
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,6 +130,9 @@ export default function UsersPage() {
         userData.accessibleDepartments = formData.accessibleDepartments.length > 0
           ? formData.accessibleDepartments
           : [formData.department];
+        userData.departmentAssignments = formData.departmentAssignments.filter(
+          (assignment) => assignment.department && assignment.level
+        );
       }
 
       if (modalMode === 'create') {
@@ -107,6 +158,19 @@ export default function UsersPage() {
   const handleEdit = (user: any) => {
     setSelectedUser(user);
     setModalMode('edit');
+    
+    const assignments = user.departmentAssignments?.map((a: any) => ({
+      department: a.department?._id || a.department,
+      level: a.level?._id || a.level,
+    })) || [];
+    
+    // Fetch levels for each department in assignments
+    assignments.forEach((assignment: any) => {
+      if (assignment.department && !availableLevels[assignment.department]) {
+        fetchLevelsForDepartment(assignment.department);
+      }
+    });
+    
     setFormData({
       name: user.name,
       email: user.email,
@@ -116,6 +180,7 @@ export default function UsersPage() {
       level: user.level || 1,
       designation: user.designation || '',
       accessibleDepartments: user.accessibleDepartments?.map((d: any) => d._id) || [],
+      departmentAssignments: assignments,
     });
     setShowModal(true);
   };
@@ -160,6 +225,7 @@ export default function UsersPage() {
       level: 1,
       designation: '',
       accessibleDepartments: [],
+      departmentAssignments: [],
     });
   };
 
@@ -435,6 +501,106 @@ export default function UsersPage() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                           required
                         />
+                      </div>
+                    )}
+
+                    {formData.role === 'director' && (
+                      <div className="col-span-2 space-y-4 border-t pt-4">
+                        <h3 className="text-sm font-semibold text-gray-900">Multi-Department Access</h3>
+                        
+                        {/* Accessible Departments */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Accessible Departments
+                          </label>
+                          <div className="border border-gray-300 rounded-lg p-3 max-h-32 overflow-y-auto space-y-2">
+                            {departments.map((dept) => (
+                              <label key={dept._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.accessibleDepartments.includes(dept._id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setFormData({ 
+                                        ...formData, 
+                                        accessibleDepartments: [...formData.accessibleDepartments, dept._id] 
+                                      });
+                                    } else {
+                                      setFormData({ 
+                                        ...formData, 
+                                        accessibleDepartments: formData.accessibleDepartments.filter(d => d !== dept._id),
+                                        departmentAssignments: formData.departmentAssignments.filter(a => a.department !== dept._id)
+                                      });
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                />
+                                <span className="text-sm text-gray-700">{dept.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Director can view files from these departments
+                          </p>
+                        </div>
+
+                        {/* Department Level Assignments */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                              Level Assignments (Optional)
+                            </label>
+                            <button
+                              type="button"
+                              onClick={addDepartmentAssignment}
+                              className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
+                            >
+                              + Add Assignment
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            {formData.departmentAssignments.map((assignment, index) => (
+                              <div key={index} className="flex gap-2 items-center p-2 border border-gray-200 rounded-lg">
+                                <select
+                                  value={assignment.department}
+                                  onChange={(e) => updateDepartmentAssignment(index, 'department', e.target.value)}
+                                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                >
+                                  <option value="">Select Department</option>
+                                  {formData.accessibleDepartments.map(deptId => {
+                                    const dept = departments.find(d => d._id === deptId);
+                                    return dept ? (
+                                      <option key={dept._id} value={dept._id}>{dept.name}</option>
+                                    ) : null;
+                                  })}
+                                </select>
+                                <select
+                                  value={assignment.level}
+                                  onChange={(e) => updateDepartmentAssignment(index, 'level', e.target.value)}
+                                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                  disabled={!assignment.department}
+                                >
+                                  <option value="">Select Level</option>
+                                  {availableLevels[assignment.department]?.map((level: any) => (
+                                    <option key={level._id} value={level._id}>
+                                      {level.levelName} (L{level.levelNumber})
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => removeDepartmentAssignment(index)}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                >
+                                  <FiX className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Assign director to specific levels in departments for reviewing files
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>

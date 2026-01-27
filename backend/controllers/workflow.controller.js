@@ -19,15 +19,7 @@ exports.passToNextLevel = async (req, res) => {
       });
     }
 
-    // Check if user is current handler
-    if (file.currentHandler.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'You are not authorized to pass this file.' 
-      });
-    }
-
-    // Get workflow
+    // Get workflow first to check assigned handlers
     const workflow = await Workflow.findOne({ 
       file: fileId, 
       status: 'active' 
@@ -37,6 +29,19 @@ exports.passToNextLevel = async (req, res) => {
       return res.status(404).json({ 
         success: false, 
         message: 'Workflow not found.' 
+      });
+    }
+
+    // Check if user is current handler OR one of the assigned handlers
+    const lastStep = workflow.steps[workflow.steps.length - 1];
+    const assignedHandlers = lastStep?.assignedHandlers || [];
+    const isCurrentHandler = file.currentHandler.toString() === req.user._id.toString();
+    const isAssignedHandler = assignedHandlers.some(h => h.toString() === req.user._id.toString());
+    
+    if (!isCurrentHandler && !isAssignedHandler) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You are not authorized to pass this file.' 
       });
     }
 
@@ -69,31 +74,40 @@ exports.passToNextLevel = async (req, res) => {
       });
     }
 
-    // Validate next handler belongs to department
-    const nextHandlerUser = await User.findById(nextHandler);
-    if (!nextHandlerUser) {
+    // Handle both single handler (string) and multiple handlers (array)
+    const handlerIds = Array.isArray(nextHandler) ? nextHandler : [nextHandler];
+    const primaryHandler = handlerIds[0];
+
+    // Validate all handlers
+    const handlers = await User.find({ _id: { $in: handlerIds } });
+    if (handlers.length !== handlerIds.length) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Next handler not found.' 
+        message: 'One or more handlers not found.' 
       });
     }
 
-    if (nextHandlerUser.department.toString() !== file.department.toString()) {
+    // Validate all handlers belong to same department
+    const invalidHandlers = handlers.filter(
+      h => h.department.toString() !== file.department.toString()
+    );
+    if (invalidHandlers.length > 0) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Next handler must be from the same department.' 
+        message: 'All handlers must be from the same department.' 
       });
     }
 
-    // Update file
+    // Update file - assign to primary handler
     file.currentLevel = nextLevel._id;
-    file.currentHandler = nextHandler;
+    file.currentHandler = primaryHandler;
     file.status = 'in-progress';
 
-    // Add step to workflow
+    // Add step to workflow with all assigned handlers
     workflow.steps.push({
       level: file.currentLevel._id,
       handler: req.user._id,
+      assignedHandlers: handlerIds, // Store all assigned handlers
       action: action || 'passed',
       signature,
       comments,

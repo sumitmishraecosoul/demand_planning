@@ -11,6 +11,11 @@ const workflowStepSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  // Multiple handlers assigned to this step (if applicable)
+  assignedHandlers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   action: {
     type: String,
     enum: ['uploaded', 'reviewed', 'approved', 'rejected', 'updated', 'passed'],

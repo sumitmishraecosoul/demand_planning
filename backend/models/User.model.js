@@ -35,6 +35,17 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Department'
   }],
+  // For director - specific level assignments in each department
+  departmentAssignments: [{
+    department: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Department'
+    },
+    level: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Level'
+    }
+  }],
   level: {
     type: Number,
     required: function() {

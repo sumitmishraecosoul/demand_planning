@@ -23,11 +23,11 @@ export default function LevelsPage() {
   const [levelForm, setLevelForm] = useState({
     levelName: '',
     description: '',
-    defaultHandler: '',
+    handlers: [] as string[],
   });
 
   const [levelForms, setLevelForms] = useState<any[]>([
-    { levelName: '', description: '', defaultHandler: '' },
+    { levelName: '', description: '', handlers: [] as string[] },
   ]);
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function LevelsPage() {
   };
 
   const addLevelForm = () => {
-    setLevelForms([...levelForms, { levelName: '', description: '', defaultHandler: '' }]);
+    setLevelForms([...levelForms, { levelName: '', description: '', handlers: [] as string[] }]);
   };
 
   const removeLevelForm = (index: number) => {
@@ -82,9 +82,20 @@ export default function LevelsPage() {
     setLevelForms(newForms);
   };
 
-  const updateLevelForm = (index: number, field: string, value: string) => {
+  const updateLevelForm = (index: number, field: string, value: any) => {
     const newForms = [...levelForms];
     newForms[index][field] = value;
+    setLevelForms(newForms);
+  };
+
+  const toggleHandlerInBulkForm = (index: number, handlerId: string) => {
+    const newForms = [...levelForms];
+    const handlers = newForms[index].handlers || [];
+    if (handlers.includes(handlerId)) {
+      newForms[index].handlers = handlers.filter((h: string) => h !== handlerId);
+    } else {
+      newForms[index].handlers = [...handlers, handlerId];
+    }
     setLevelForms(newForms);
   };
 
@@ -99,7 +110,7 @@ export default function LevelsPage() {
       });
       toast.success('Levels created successfully!');
       setShowModal(false);
-      setLevelForms([{ levelName: '', description: '', defaultHandler: '' }]);
+      setLevelForms([{ levelName: '', description: '', handlers: [] as string[] }]);
       fetchLevels();
     } catch (error: any) {
       console.error('Error creating levels:', error);
@@ -118,11 +129,11 @@ export default function LevelsPage() {
         departmentId: selectedDepartment,
         levelName: levelForm.levelName,
         description: levelForm.description,
-        defaultHandler: levelForm.defaultHandler || undefined,
+        handlers: levelForm.handlers,
       });
       toast.success('Level added successfully!');
       setShowModal(false);
-      setLevelForm({ levelName: '', description: '', defaultHandler: '' });
+      setLevelForm({ levelName: '', description: '', handlers: [] as string[] });
       fetchLevels();
     } catch (error: any) {
       console.error('Error adding level:', error);
@@ -142,12 +153,12 @@ export default function LevelsPage() {
       await adminAPI.updateLevel(selectedLevel._id, {
         levelName: levelForm.levelName,
         description: levelForm.description,
-        defaultHandler: levelForm.defaultHandler || undefined,
+        handlers: levelForm.handlers,
       });
       toast.success('Level updated successfully!');
       setShowModal(false);
       setSelectedLevel(null);
-      setLevelForm({ levelName: '', description: '', defaultHandler: '' });
+      setLevelForm({ levelName: '', description: '', handlers: [] as string[] });
       fetchLevels();
     } catch (error: any) {
       console.error('Error updating level:', error);
@@ -178,7 +189,7 @@ export default function LevelsPage() {
   const openAddModal = () => {
     setModalMode('add');
     setSelectedLevel(null);
-    setLevelForm({ levelName: '', description: '', defaultHandler: '' });
+    setLevelForm({ levelName: '', description: '', handlers: [] as string[] });
     setShowModal(true);
   };
 
@@ -188,7 +199,7 @@ export default function LevelsPage() {
     setLevelForm({
       levelName: level.levelName,
       description: level.description || '',
-      defaultHandler: level.defaultHandler?._id || '',
+      handlers: level.handlers?.map((h: any) => h._id) || [],
     });
     setShowModal(true);
   };
@@ -196,7 +207,7 @@ export default function LevelsPage() {
   const openBulkModal = () => {
     setModalMode('bulk');
     setSelectedLevel(null);
-    setLevelForms([{ levelName: '', description: '', defaultHandler: '' }]);
+    setLevelForms([{ levelName: '', description: '', handlers: [] as string[] }]);
     setShowModal(true);
   };
 
@@ -294,11 +305,20 @@ export default function LevelsPage() {
                               {level.description && (
                                 <p className="text-sm text-gray-600 mt-1">{level.description}</p>
                               )}
-                              {level.defaultHandler && (
-                                <p className="text-sm text-gray-500 mt-2">
-                                  Default Handler: {level.defaultHandler.name} (
-                                  {level.defaultHandler.designation})
-                                </p>
+                              {level.handlers && level.handlers.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs text-gray-500 mb-1">Handlers:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {level.handlers.map((handler: any) => (
+                                      <span
+                                        key={handler._id}
+                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
+                                      >
+                                        {handler.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
                             </div>
                             <div className="flex items-center gap-2 ml-4">
@@ -388,21 +408,35 @@ export default function LevelsPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Default Handler
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Handlers (Select Multiple)
                       </label>
-                      <select
-                        value={levelForm.defaultHandler}
-                        onChange={(e) => setLevelForm({ ...levelForm, defaultHandler: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      >
-                        <option value="">Select user...</option>
-                        {users.map((user) => (
-                          <option key={user._id} value={user._id}>
-                            {user.name} - {user.designation}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                        {users.length === 0 ? (
+                          <p className="text-sm text-gray-500">No users available in this department</p>
+                        ) : (
+                          users.map((user) => (
+                            <label key={user._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                              <input
+                                type="checkbox"
+                                checked={levelForm.handlers.includes(user._id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setLevelForm({ ...levelForm, handlers: [...levelForm.handlers, user._id] });
+                                  } else {
+                                    setLevelForm({ ...levelForm, handlers: levelForm.handlers.filter(h => h !== user._id) });
+                                  }
+                                }}
+                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                              />
+                              <span className="text-sm text-gray-700">{user.name} - {user.designation}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      {levelForm.handlers.length > 0 && (
+                        <p className="mt-2 text-xs text-gray-500">{levelForm.handlers.length} handler(s) selected</p>
+                      )}
                     </div>
 
                     <div className="flex gap-3 pt-4">
@@ -453,40 +487,18 @@ export default function LevelsPage() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Level Name <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={form.levelName}
-                            onChange={(e) => updateLevelForm(index, 'levelName', e.target.value)}
-                            placeholder="e.g., L1, Manager, Senior Officer"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Default Handler
-                          </label>
-                          <select
-                            value={form.defaultHandler}
-                            onChange={(e) =>
-                              updateLevelForm(index, 'defaultHandler', e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                          >
-                            <option value="">Select user...</option>
-                            {users.map((user) => (
-                              <option key={user._id} value={user._id}>
-                                {user.name} - {user.designation}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Level Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={form.levelName}
+                          onChange={(e) => updateLevelForm(index, 'levelName', e.target.value)}
+                          placeholder="e.g., L1, Manager, Senior Officer"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          required
+                        />
                       </div>
 
                       <div>
@@ -500,6 +512,32 @@ export default function LevelsPage() {
                           placeholder="Enter level description..."
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Handlers (Select Multiple)
+                        </label>
+                        <div className="border border-gray-300 rounded-lg p-2 max-h-32 overflow-y-auto space-y-1">
+                          {users.length === 0 ? (
+                            <p className="text-xs text-gray-500">No users available</p>
+                          ) : (
+                            users.map((user) => (
+                              <label key={user._id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={form.handlers?.includes(user._id) || false}
+                                  onChange={() => toggleHandlerInBulkForm(index, user._id)}
+                                  className="w-3 h-3 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                />
+                                <span className="text-xs">{user.name}</span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                        {form.handlers?.length > 0 && (
+                          <p className="mt-1 text-xs text-gray-500">{form.handlers.length} selected</p>
+                        )}
                       </div>
                     </div>
                   ))}
