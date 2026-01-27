@@ -55,7 +55,7 @@ const fileSchema = new mongoose.Schema({
   },
   demandType: {
     type: String,
-    enum: ['Regular', 'Promotional', 'Seasonal', 'Emergency'],
+    enum: ['Regular', 'Sample', 'Promotional', 'Seasonal', 'Emergency'],
     default: 'Regular'
   },
   month: {

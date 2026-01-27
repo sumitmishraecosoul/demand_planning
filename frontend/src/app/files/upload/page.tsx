@@ -87,7 +87,7 @@ export default function UploadFilePage() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['user']}>
+    <ProtectedRoute>
       <Layout>
         <div className="max-w-2xl mx-auto space-y-6">
           {/* Header */}
@@ -158,6 +158,7 @@ export default function UploadFilePage() {
                   disabled={uploading}
                 >
                   <option value="Regular">Regular</option>
+                  <option value="Sample">Sample</option>
                   <option value="Promotional">Promotional</option>
                   <option value="Seasonal">Seasonal</option>
                   <option value="Emergency">Emergency</option>

@@ -87,15 +87,13 @@ export default function FilesPage() {
                 Browse and manage documents
               </p>
             </div>
-            {user?.role === 'user' && (
-              <button
-                onClick={() => router.push('/files/upload')}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
-              >
-                <FiPlus className="w-5 h-5" />
-                Upload File
-              </button>
-            )}
+            <button
+              onClick={() => router.push('/files/upload')}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+            >
+              <FiPlus className="w-5 h-5" />
+              Upload File
+            </button>
           </div>
 
           {/* Files List */}
