@@ -5,6 +5,7 @@ import { FiDownload, FiX } from 'react-icons/fi';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { fileAPI } from '@/lib/api';
+import WorkflowTimeline from './WorkflowTimeline';
 
 interface FilePreviewProps {
   file: any;
@@ -212,6 +213,9 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
               )}
             </div>
           </div>
+
+          {/* Workflow Timeline */}
+          <WorkflowTimeline file={file} />
 
           {/* Description */}
           {file.description && (

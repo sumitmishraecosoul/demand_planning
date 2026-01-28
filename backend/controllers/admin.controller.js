@@ -490,3 +490,77 @@ exports.deleteUser = async (req, res) => {
     });
   }
 };
+
+// Fix files with missing currentLevel or currentHandler
+exports.fixBrokenFiles = async (req, res) => {
+  try {
+    const File = require('../models/File.model');
+    const Level = require('../models/Level.model');
+
+    // Find all files with null currentLevel or currentHandler
+    const brokenFiles = await File.find({
+      $or: [
+        { currentLevel: null },
+        { currentHandler: null }
+      ]
+    }).populate('department');
+
+    if (brokenFiles.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No broken files found. All files are valid!',
+        fixed: 0
+      });
+    }
+
+    let fixed = 0;
+    const errors = [];
+
+    for (const file of brokenFiles) {
+      try {
+        // Get first level of the file's department
+        const firstLevel = await Level.findOne({
+          department: file.department._id,
+          levelNumber: 1,
+          isActive: true
+        }).populate('handlers');
+
+        if (!firstLevel || !firstLevel.handlers || firstLevel.handlers.length === 0) {
+          errors.push({
+            fileId: file._id,
+            title: file.title,
+            error: 'No Level 1 or handlers found for department'
+          });
+          continue;
+        }
+
+        // Fix the file
+        file.currentLevel = firstLevel._id;
+        file.currentHandler = firstLevel.handlers[0]._id;
+        await file.save();
+        fixed++;
+      } catch (error) {
+        errors.push({
+          fileId: file._id,
+          title: file.title,
+          error: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Fixed ${fixed} out of ${brokenFiles.length} broken files.`,
+      fixed,
+      total: brokenFiles.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error) {
+    console.error('Fix broken files error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fixing files.',
+      error: error.message
+    });
+  }
+};

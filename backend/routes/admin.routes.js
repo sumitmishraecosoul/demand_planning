@@ -25,4 +25,7 @@ router.put('/users/:userId', adminController.updateUser);
 router.patch('/users/:userId/deactivate', adminController.deactivateUser);
 router.delete('/users/:userId', adminController.deleteUser);
 
+// System maintenance routes
+router.post('/fix-broken-files', adminController.fixBrokenFiles);
+
 module.exports = router;

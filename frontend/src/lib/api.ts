@@ -170,6 +170,7 @@ export const fileAPI = {
     api.put(`/files/${fileId}/update`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  deleteFile: (fileId: string) => api.delete(`/files/${fileId}`),
 };
 
 // Workflow API
@@ -191,6 +192,17 @@ export const workflowAPI = {
     api.get(`/workflow/levels/${levelId}/users`, {
       params: { excludeUserId },
     }),
+};
+
+export const notificationAPI = {
+  getNotifications: (unreadOnly?: boolean) =>
+    api.get('/notifications', {
+      params: { unreadOnly },
+    }),
+  markAsRead: (notificationId: string) =>
+    api.patch(`/notifications/${notificationId}/read`),
+  markAllAsRead: () =>
+    api.patch('/notifications/mark-all-read'),
 };
 
 // User API

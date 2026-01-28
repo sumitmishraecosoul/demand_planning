@@ -1,9 +1,9 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/useAuthStore';
-import { authAPI } from '@/lib/api';
+import { authAPI, notificationAPI } from '@/lib/api';
 import toast from 'react-hot-toast';
 import {
   FiHome,
@@ -13,6 +13,7 @@ import {
   FiSettings,
   FiLogOut,
   FiMenu,
+  FiBell,
 } from 'react-icons/fi';
 import { useState } from 'react';
 
@@ -24,6 +25,24 @@ export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notifications count
+  useEffect(() => {
+    fetchUnreadCount();
+    // Poll every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const response = await notificationAPI.getNotifications(true);
+      setUnreadCount(response.data.unreadCount || 0);
+    } catch (error) {
+      console.error('Error fetching notification count:', error);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -66,6 +85,20 @@ export default function Layout({ children }: LayoutProps) {
             <h1 className="text-xl font-bold text-primary-600">Demand Planning</h1>
           </div>
           <div className="flex items-center gap-4">
+            {/* Notification Bell */}
+            <button
+              onClick={() => router.push('/notifications')}
+              className="relative text-gray-500 hover:text-primary-600 transition-colors p-2"
+              title="Notifications"
+            >
+              <FiBell className="w-6 h-6" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
             <div className="text-right">
               <p className="text-sm font-medium text-gray-900">{user?.name}</p>
               <p className="text-xs text-gray-500 capitalize">{user?.role}</p>

@@ -169,7 +169,7 @@ export default function LevelsPage() {
   };
 
   const handleDeleteLevel = async (levelId: string) => {
-    if (!confirm('Are you sure you want to delete this level? This will affect the workflow hierarchy.')) {
+    if (!confirm('Are you sure you want to delete this level? This will affect the approval flow.')) {
       return;
     }
 
@@ -218,9 +218,9 @@ export default function LevelsPage() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Manage Levels</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Approval Flow</h1>
               <p className="text-gray-600 mt-1">
-                Configure hierarchical levels for departments
+                Configure approval flow for departments
               </p>
             </div>
             {selectedDepartment && (
@@ -281,14 +281,14 @@ export default function LevelsPage() {
               ) : levels.length === 0 ? (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
                   <p className="text-gray-500">
-                    No levels configured for this department. Click "Configure Levels" to set up
-                    the hierarchy.
+                    No levels configured for this department. Click "Configure All Levels" to set up
+                    the approval flow.
                   </p>
                 </div>
               ) : (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                    Current Level Hierarchy
+                    Current Approval Flow
                   </h2>
                   <div className="space-y-3">
                     {levels.map((level, index) => (
@@ -375,8 +375,8 @@ export default function LevelsPage() {
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                       <p className="text-sm text-blue-800">
                         {modalMode === 'add' 
-                          ? 'This will add a new level to the end of the existing hierarchy.'
-                          : 'Update the level details. This will not affect the hierarchy order.'}
+                          ? 'This will add a new level to the end of the current approval flow.'
+                          : 'Update the level details. This will not affect the flow sequence.'}
                       </p>
                     </div>
 
@@ -464,7 +464,7 @@ export default function LevelsPage() {
                   <form onSubmit={handleCreateLevels} className="p-6 space-y-4">
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                     <p className="text-sm text-yellow-800">
-                      <strong>Note:</strong> Creating new levels will replace the existing hierarchy
+                      <strong>Note:</strong> Creating new levels will replace the existing approval flow
                       for this department.
                     </p>
                   </div>

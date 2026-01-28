@@ -34,6 +34,7 @@ app.use('/api/departments', require('./routes/department.routes'));
 app.use('/api/files', require('./routes/file.routes'));
 app.use('/api/workflow', require('./routes/workflow.routes'));
 app.use('/api/users', require('./routes/user.routes'));
+app.use('/api/notifications', require('./routes/notification.routes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

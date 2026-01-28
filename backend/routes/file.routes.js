@@ -12,5 +12,6 @@ router.get('/', fileController.getFiles);
 router.get('/:fileId', fileController.getFile);
 router.get('/:fileId/download/:version?', fileController.downloadFile);
 router.put('/:fileId/update', upload.single('file'), fileController.updateFile);
+router.delete('/:fileId', fileController.deleteFile);
 
 module.exports = router;

@@ -2,6 +2,7 @@ const Workflow = require('../models/Workflow.model');
 const File = require('../models/File.model');
 const Level = require('../models/Level.model');
 const User = require('../models/User.model');
+const { createBulkNotifications } = require('./notification.controller');
 
 // Pass file to next level
 exports.passToNextLevel = async (req, res) => {
@@ -125,6 +126,22 @@ exports.passToNextLevel = async (req, res) => {
       .populate('createdBy', 'name email')
       .populate('versions.uploadedBy', 'name email');
 
+    // Create notifications for all assigned handlers
+    try {
+      const nextLevelName = nextLevel.levelName || `Level ${nextLevel.levelNumber}`;
+      await createBulkNotifications(
+        handlerIds,
+        req.user._id,
+        file._id,
+        'assigned',
+        'New File Assigned',
+        `${req.user.name} has assigned "${file.title}" to you at ${nextLevelName}`,
+        '/files/my-files'
+      );
+    } catch (notifError) {
+      console.error('Error creating notifications:', notifError);
+    }
+
     res.json({
       success: true,
       message: 'File passed to next level successfully.',
@@ -133,10 +150,10 @@ exports.passToNextLevel = async (req, res) => {
     });
   } catch (error) {
     console.error('Pass to next level error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error passing file to next level.', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Error passing file to next level.',
+      error: error.message
     });
   }
 };
@@ -201,6 +218,21 @@ exports.rejectFile = async (req, res) => {
       .populate('createdBy', 'name email')
       .populate('versions.uploadedBy', 'name email');
 
+    // Notify file creator about rejection
+    try {
+      await createBulkNotifications(
+        [file.createdBy._id],
+        req.user._id,
+        file._id,
+        'rejected',
+        'File Rejected',
+        `${req.user.name} has rejected "${file.title}". Reason: ${comments || 'No reason provided'}`,
+        `/files/${file._id}`
+      );
+    } catch (notifError) {
+      console.error('Error creating notifications:', notifError);
+    }
+
     res.json({
       success: true,
       message: 'File rejected successfully.',
@@ -209,10 +241,10 @@ exports.rejectFile = async (req, res) => {
     });
   } catch (error) {
     console.error('Reject file error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error rejecting file.', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Error rejecting file.',
+      error: error.message
     });
   }
 };
@@ -482,6 +514,22 @@ exports.passToSameLevel = async (req, res) => {
       .populate('currentHandler', 'name email designation')
       .populate('createdBy', 'name email');
 
+    // Create notifications for assigned same-level handlers
+    try {
+      const levelName = level.levelName || `Level ${level.levelNumber}`;
+      await createBulkNotifications(
+        handlerIds,
+        req.user._id,
+        file._id,
+        'assigned',
+        'File Assigned for Review',
+        `${req.user.name} has assigned "${file.title}" to you for review at ${levelName}`,
+        '/files/my-files'
+      );
+    } catch (notifError) {
+      console.error('Error creating notifications:', notifError);
+    }
+
     res.json({
       success: true,
       message: 'File passed to same level handler successfully.',
@@ -563,6 +611,21 @@ exports.completeFile = async (req, res) => {
       .populate('currentLevel', 'levelName levelNumber')
       .populate('currentHandler', 'name email designation')
       .populate('createdBy', 'name email');
+
+    // Notify file creator about completion
+    try {
+      await createBulkNotifications(
+        [file.createdBy._id],
+        req.user._id,
+        file._id,
+        'completed',
+        'Workflow Completed',
+        `${req.user.name} has completed the workflow for "${file.title}". All reviews are done!`,
+        `/files/${file._id}`
+      );
+    } catch (notifError) {
+      console.error('Error creating notifications:', notifError);
+    }
 
     res.json({
       success: true,

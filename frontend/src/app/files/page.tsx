@@ -10,7 +10,7 @@ import { FileCardShimmer } from '@/components/Shimmer';
 import { fileAPI } from '@/lib/api';
 import { useAuthStore } from '@/store/useAuthStore';
 import toast from 'react-hot-toast';
-import { FiEye, FiDownload, FiActivity, FiPlus } from 'react-icons/fi';
+import { FiEye, FiDownload, FiActivity, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 export default function FilesPage() {
   const router = useRouter();
@@ -57,6 +57,21 @@ export default function FilesPage() {
     } catch (error) {
       console.error('Error downloading file:', error);
       toast.error('Failed to download file');
+    }
+  };
+
+  const handleDelete = async (fileId: string, fileName: string) => {
+    if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await fileAPI.deleteFile(fileId);
+      toast.success('File deleted successfully');
+      fetchFiles(); // Refresh the file list
+    } catch (error: any) {
+      console.error('Error deleting file:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete file');
     }
   };
 
@@ -120,7 +135,7 @@ export default function FilesPage() {
                         Department
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Current Level
+                        Assigned On
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Current Handler
@@ -155,7 +170,12 @@ export default function FilesPage() {
                           {file.department?.name}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {file.currentLevel?.levelName}
+                          <div>
+                            <div>{new Date(file.updatedAt).toLocaleDateString()}</div>
+                            <div className="text-xs text-gray-500">
+                              {new Date(file.updatedAt).toLocaleTimeString()}
+                            </div>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
@@ -211,6 +231,17 @@ export default function FilesPage() {
                             >
                               <FiActivity className="w-5 h-5" />
                             </button>
+                            {(user?.role === 'admin' || 
+                              user?.role === 'director' || 
+                              file.createdBy?._id === user?.id) && (
+                              <button
+                                onClick={() => handleDelete(file._id, file.title)}
+                                className="text-red-600 hover:text-red-900"
+                                title="Delete File"
+                              >
+                                <FiTrash2 className="w-5 h-5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

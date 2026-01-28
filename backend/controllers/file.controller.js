@@ -32,24 +32,63 @@ exports.uploadFile = async (req, res) => {
 
     const { title, description, channel, demandType, month, year, department, signature, comments } = req.body;
 
-    // Get first level of department
-    const firstLevel = await Level.findOne({ 
-      department, 
-      levelNumber: 1,
-      isActive: true 
-    }).populate('defaultHandler');
+    // Determine the uploader's level in this department
+    let uploaderLevelId;
+    let uploaderLevelNumber;
 
-    if (!firstLevel) {
+    if (req.user.role === 'director') {
+      // For directors, find their level assignment in this department
+      const User = require('../models/User.model');
+      const userWithAssignments = await User.findById(req.user._id).populate('departmentAssignments.level');
+      
+      const assignment = userWithAssignments.departmentAssignments.find(
+        a => a.department.toString() === department.toString()
+      );
+
+      if (!assignment) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'You are not assigned to any level in this department. Please contact admin.' 
+        });
+      }
+
+      uploaderLevelId = assignment.level._id;
+      uploaderLevelNumber = assignment.level.levelNumber;
+    } else {
+      // For regular users, use their level field
+      uploaderLevelNumber = req.user.level;
+      
+      // Find the level document for this department and level number
+      const userLevel = await Level.findOne({
+        department,
+        levelNumber: uploaderLevelNumber,
+        isActive: true
+      });
+
+      if (!userLevel) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `No Level ${uploaderLevelNumber} configured for this department. Please contact admin.` 
+        });
+      }
+
+      uploaderLevelId = userLevel._id;
+    }
+
+    // Get the level where file should start (uploader's level)
+    const startingLevel = await Level.findById(uploaderLevelId).populate('handlers');
+
+    if (!startingLevel) {
       return res.status(400).json({ 
         success: false, 
-        message: 'No levels configured for this department. Please contact admin.' 
+        message: 'Level not found for this department. Please contact admin.' 
       });
     }
 
     // Normalize MIME type based on file extension
     const normalizedMimeType = normalizeMimeType(req.file.originalname, req.file.mimetype);
 
-    // Create file record
+    // Create file record - assign to uploader's level with uploader as handler
     const file = await File.create({
       title,
       description,
@@ -58,8 +97,8 @@ exports.uploadFile = async (req, res) => {
       month,
       year: year ? parseInt(year) : undefined,
       department,
-      currentLevel: firstLevel._id,
-      currentHandler: firstLevel.defaultHandler._id,
+      currentLevel: startingLevel._id,
+      currentHandler: req.user._id, // Uploader is the initial handler
       status: 'pending',
       createdBy: req.user._id,
       versions: [{
@@ -80,7 +119,7 @@ exports.uploadFile = async (req, res) => {
       file: file._id,
       department,
       steps: [{
-        level: firstLevel._id,
+        level: startingLevel._id,
         handler: req.user._id,
         action: 'uploaded',
         signature,
@@ -172,9 +211,59 @@ exports.getFiles = async (req, res) => {
       .populate('versions.uploadedBy', 'name email')
       .sort({ createdAt: -1 });
 
+    // Auto-fix files with missing currentLevel/currentHandler
+    const filesToFix = files.filter(f => !f.currentLevel || !f.currentHandler);
+    if (filesToFix.length > 0) {
+      for (const file of filesToFix) {
+        try {
+          const firstLevel = await Level.findOne({
+            department: file.department._id,
+            levelNumber: 1,
+            isActive: true
+          }).populate('handlers');
+
+          if (firstLevel && firstLevel.handlers && firstLevel.handlers.length > 0) {
+            await File.findByIdAndUpdate(file._id, {
+              currentLevel: firstLevel._id,
+              currentHandler: firstLevel.handlers[0]._id
+            });
+            // Update the file object for response
+            file.currentLevel = firstLevel;
+            file.currentHandler = firstLevel.handlers[0];
+          }
+        } catch (error) {
+          console.error('Error auto-fixing file:', file._id, error);
+        }
+      }
+    }
+
+    // Enrich files with department levels and workflow history for timeline
+    const enrichedFiles = await Promise.all(files.map(async (file) => {
+      const fileObj = file.toObject();
+      
+      // Get all levels for this department
+      const departmentLevels = await Level.find({
+        department: file.department._id,
+        isActive: true
+      })
+        .populate('handlers', 'name email designation')
+        .sort({ levelNumber: 1 });
+
+      // Get workflow history
+      const workflow = await Workflow.findOne({ file: file._id })
+        .populate('steps.level', 'levelName levelNumber')
+        .populate('steps.handler', 'name email designation')
+        .populate('steps.assignedHandlers', 'name email designation');
+
+      fileObj.departmentLevels = departmentLevels;
+      fileObj.workflowHistory = workflow;
+
+      return fileObj;
+    }));
+
     res.json({
       success: true,
-      files
+      files: enrichedFiles
     });
   } catch (error) {
     console.error('Get files error:', error);
@@ -213,6 +302,23 @@ exports.getFile = async (req, res) => {
         message: 'Access denied.' 
       });
     }
+
+    // Get all levels for this department (for workflow timeline)
+    const departmentLevels = await Level.find({
+      department: file.department._id,
+      isActive: true
+    })
+      .populate('handlers', 'name email designation')
+      .sort({ levelNumber: 1 });
+
+    // Get workflow history for this file
+    const workflow = await Workflow.findOne({ file: fileId })
+      .populate('steps.level', 'levelName levelNumber')
+      .populate('steps.handler', 'name email designation')
+      .populate('steps.assignedHandlers', 'name email designation');
+
+    file._doc.departmentLevels = departmentLevels;
+    file._doc.workflowHistory = workflow;
 
     res.json({
       success: true,
@@ -361,6 +467,58 @@ exports.updateFile = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Error updating file.', 
+      error: error.message 
+    });
+  }
+};
+
+// Delete file
+exports.deleteFile = async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    const file = await File.findById(fileId);
+
+    if (!file) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'File not found.' 
+      });
+    }
+
+    // Check authorization - only admin, director, or file creator can delete
+    if (req.user.role !== 'admin' && 
+        req.user.role !== 'director' && 
+        file.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You are not authorized to delete this file.' 
+      });
+    }
+
+    // Delete physical files
+    file.versions.forEach(version => {
+      const filePath = path.resolve(version.filePath);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    });
+
+    // Delete workflow
+    await Workflow.deleteMany({ file: fileId });
+
+    // Delete file record
+    await File.findByIdAndDelete(fileId);
+
+    res.json({
+      success: true,
+      message: 'File deleted successfully.'
+    });
+  } catch (error) {
+    console.error('Delete file error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error deleting file.', 
       error: error.message 
     });
   }

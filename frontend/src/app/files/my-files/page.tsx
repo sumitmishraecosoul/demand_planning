@@ -77,7 +77,18 @@ export default function MyFilesPage() {
   const handlePassFile = async (file: any) => {
     setSelectedFile(file);
     setActionType('pass');
-    await fetchDepartmentUsers(file.department._id, file.currentLevel._id, file);
+    
+    // Handle both old and new file formats
+    const departmentId = file.department?._id || file.department;
+    const currentLevelId = file.currentLevel?._id || file.currentLevel;
+    
+    if (currentLevelId) {
+      await fetchDepartmentUsers(departmentId, currentLevelId, file);
+    } else {
+      // If no currentLevel, just show modal without pre-fetching users
+      setDepartmentUsers([]);
+    }
+    
     setShowSignature(true);
   };
 
