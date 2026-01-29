@@ -6,7 +6,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { TableShimmer } from '@/components/Shimmer';
 import { adminAPI } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { FiPlus, FiX } from 'react-icons/fi';
+import { FiPlus, FiX, FiTrash2 } from 'react-icons/fi';
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<any[]>([]);
@@ -51,6 +51,21 @@ export default function DepartmentsPage() {
     }
   };
 
+  const handleDelete = async (departmentId: string, departmentName: string) => {
+    if (!confirm(`Are you sure you want to delete "${departmentName}" department? This action cannot be undone.\n\nNote: All levels and users in this department will be affected.`)) {
+      return;
+    }
+
+    try {
+      await adminAPI.deleteDepartment(departmentId);
+      toast.success('Department deleted successfully!');
+      fetchDepartments();
+    } catch (error: any) {
+      console.error('Error deleting department:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete department');
+    }
+  };
+
   return (
     <ProtectedRoute allowedRoles={['admin']}>
       <Layout>
@@ -82,11 +97,20 @@ export default function DepartmentsPage() {
               {departments.map((dept) => (
                 <div
                   key={dept._id}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 relative group"
                 >
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {dept.name}
-                  </h3>
+                  <div className="flex items-start justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {dept.name}
+                    </h3>
+                    <button
+                      onClick={() => handleDelete(dept._id, dept.name)}
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                      title="Delete Department"
+                    >
+                      <FiTrash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                   {dept.description && (
                     <p className="text-gray-600 mb-4">{dept.description}</p>
                   )}

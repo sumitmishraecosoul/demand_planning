@@ -3,6 +3,7 @@ const Workflow = require('../models/Workflow.model');
 const Level = require('../models/Level.model');
 const path = require('path');
 const fs = require('fs');
+const emailService = require('../services/email.service');
 
 // Helper function to normalize MIME type based on file extension
 const normalizeMimeType = (filename, originalMimetype) => {
@@ -137,6 +138,22 @@ exports.uploadFile = async (req, res) => {
       .populate('currentHandler', 'name email designation')
       .populate('createdBy', 'name email')
       .populate('versions.uploadedBy', 'name email');
+
+    // Send email notification if handler is different from uploader
+    if (req.user._id.toString() !== populatedFile.currentHandler._id.toString()) {
+      try {
+        const levelName = startingLevel.levelName || `Level ${startingLevel.levelNumber}`;
+        await emailService.sendFileAssignedEmail(populatedFile.currentHandler, {
+          fileTitle: file.title,
+          department: populatedFile.department.name,
+          level: levelName,
+          assignedBy: req.user.name,
+          fileId: file._id
+        });
+      } catch (emailError) {
+        console.error('Error sending upload notification email:', emailError.message);
+      }
+    }
 
     res.status(201).json({
       success: true,

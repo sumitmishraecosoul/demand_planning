@@ -129,6 +129,7 @@ export const authAPI = {
 export const adminAPI = {
   createDepartment: (data: any) => api.post('/admin/departments', data),
   getDepartments: () => api.get('/admin/departments'),
+  deleteDepartment: (departmentId: string) => api.delete(`/admin/departments/${departmentId}`),
   createLevels: (data: any) => api.post('/admin/levels', data),
   getLevelsByDepartment: (departmentId: string) =>
     api.get(`/admin/levels/${departmentId}`),

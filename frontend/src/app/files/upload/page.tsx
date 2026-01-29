@@ -22,6 +22,7 @@ export default function UploadFilePage() {
   const [comments, setComments] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -63,6 +64,24 @@ export default function UploadFilePage() {
     setUploading(true);
 
     try {
+      // For directors, use selected department; for regular users, use their assigned department
+      let departmentId;
+      if (user?.role === 'director') {
+        departmentId = selectedDepartment;
+        if (!departmentId) {
+          toast.error('Please select a department');
+          setUploading(false);
+          return;
+        }
+      } else {
+        departmentId = user?.department?._id || user?.department;
+        if (!departmentId) {
+          toast.error('Department not found. Please contact admin.');
+          setUploading(false);
+          return;
+        }
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('title', title);
@@ -71,7 +90,7 @@ export default function UploadFilePage() {
       formData.append('demandType', demandType);
       formData.append('month', month);
       formData.append('year', year);
-      formData.append('department', user?.department?._id || user?.department);
+      formData.append('department', departmentId);
       formData.append('signature', signature);
       formData.append('comments', comments);
 
@@ -80,7 +99,15 @@ export default function UploadFilePage() {
       router.push('/files/my-files');
     } catch (error: any) {
       console.error('Error uploading file:', error);
-      toast.error(error.response?.data?.message || 'Failed to upload file');
+      const errorMessage = error.response?.data?.message || 'Failed to upload file';
+      toast.error(errorMessage);
+      
+      // Show additional guidance if it's a level configuration issue
+      if (errorMessage.includes('No Level') || errorMessage.includes('configured')) {
+        toast.error('Please contact admin to configure approval levels for your department.', {
+          duration: 6000
+        });
+      }
     } finally {
       setUploading(false);
     }
@@ -128,6 +155,29 @@ export default function UploadFilePage() {
                 disabled={uploading}
               />
             </div>
+
+            {/* Department Selector for Directors */}
+            {user?.role === 'director' && user?.departmentAssignments && user.departmentAssignments.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Department <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedDepartment}
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  required
+                  disabled={uploading}
+                >
+                  <option value="">Select Department</option>
+                  {user.departmentAssignments.map((assignment: any) => (
+                    <option key={assignment.department._id} value={assignment.department._id}>
+                      {assignment.department.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

@@ -10,6 +10,7 @@ router.use(isAdmin);
 // Department routes
 router.post('/departments', adminController.createDepartment);
 router.get('/departments', adminController.getDepartments);
+router.delete('/departments/:departmentId', adminController.deleteDepartment);
 
 // Level routes
 router.post('/levels', adminController.createLevels);

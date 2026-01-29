@@ -3,6 +3,7 @@ const File = require('../models/File.model');
 const Level = require('../models/Level.model');
 const User = require('../models/User.model');
 const { createBulkNotifications } = require('./notification.controller');
+const emailService = require('../services/email.service');
 
 // Pass file to next level
 exports.passToNextLevel = async (req, res) => {
@@ -138,6 +139,21 @@ exports.passToNextLevel = async (req, res) => {
         `${req.user.name} has assigned "${file.title}" to you at ${nextLevelName}`,
         '/files/my-files'
       );
+
+      // Send email notifications to all assigned handlers
+      for (const handler of handlers) {
+        try {
+          await emailService.sendFileAssignedEmail(handler, {
+            fileTitle: file.title,
+            department: populatedFile.department.name,
+            level: nextLevelName,
+            assignedBy: req.user.name,
+            fileId: file._id
+          });
+        } catch (emailError) {
+          console.error(`Error sending email to ${handler.email}:`, emailError.message);
+        }
+      }
     } catch (notifError) {
       console.error('Error creating notifications:', notifError);
     }
@@ -220,15 +236,71 @@ exports.rejectFile = async (req, res) => {
 
     // Notify file creator about rejection
     try {
+      // Get all levels below current level (L1 to current level - 1)
+      const currentLevelNumber = populatedFile.currentLevel.levelNumber;
+      const previousLevels = await Level.find({
+        department: file.department,
+        levelNumber: { $lt: currentLevelNumber },
+        isActive: true
+      }).populate('handlers', 'name email designation');
+
+      // Collect all handlers from previous levels + file creator
+      const recipientIds = [file.createdBy._id];
+      const emailRecipients = [populatedFile.createdBy];
+
+      for (const level of previousLevels) {
+        if (level.handlers && level.handlers.length > 0) {
+          level.handlers.forEach(handler => {
+            if (!recipientIds.includes(handler._id.toString())) {
+              recipientIds.push(handler._id);
+              emailRecipients.push(handler);
+            }
+          });
+        }
+      }
+
+      // Also check for directors assigned to previous levels
+      const previousLevelIds = previousLevels.map(l => l._id);
+      const directorsAtPreviousLevels = await User.find({
+        role: 'director',
+        isActive: true,
+        'departmentAssignments.department': file.department,
+        'departmentAssignments.level': { $in: previousLevelIds }
+      }).select('name email designation');
+
+      directorsAtPreviousLevels.forEach(director => {
+        if (!recipientIds.includes(director._id.toString())) {
+          recipientIds.push(director._id);
+          emailRecipients.push(director);
+        }
+      });
+
+      // Create notifications for all recipients
       await createBulkNotifications(
-        [file.createdBy._id],
+        recipientIds,
         req.user._id,
         file._id,
         'rejected',
         'File Rejected',
-        `${req.user.name} has rejected "${file.title}". Reason: ${comments || 'No reason provided'}`,
+        `${req.user.name} has rejected "${file.title}" at ${populatedFile.currentLevel.levelName}. Reason: ${comments || 'No reason provided'}`,
         `/files/${file._id}`
       );
+
+      // Send email notifications to all recipients
+      for (const recipient of emailRecipients) {
+        try {
+          await emailService.sendFileRejectedEmail(recipient, {
+            fileTitle: file.title,
+            department: populatedFile.department.name,
+            level: populatedFile.currentLevel.levelName,
+            rejectedBy: req.user.name,
+            reason: comments || 'No reason provided',
+            fileId: file._id
+          });
+        } catch (emailError) {
+          console.error(`Error sending rejection email to ${recipient.email}:`, emailError.message);
+        }
+      }
     } catch (notifError) {
       console.error('Error creating notifications:', notifError);
     }
@@ -526,6 +598,21 @@ exports.passToSameLevel = async (req, res) => {
         `${req.user.name} has assigned "${file.title}" to you for review at ${levelName}`,
         '/files/my-files'
       );
+
+      // Send email notifications to assigned handlers
+      for (const handler of handlers) {
+        try {
+          await emailService.sendFileAssignedEmail(handler, {
+            fileTitle: file.title,
+            department: populatedFile.department.name,
+            level: levelName,
+            assignedBy: req.user.name,
+            fileId: file._id
+          });
+        } catch (emailError) {
+          console.error(`Error sending email to ${handler.email}:`, emailError.message);
+        }
+      }
     } catch (notifError) {
       console.error('Error creating notifications:', notifError);
     }
@@ -623,6 +710,18 @@ exports.completeFile = async (req, res) => {
         `${req.user.name} has completed the workflow for "${file.title}". All reviews are done!`,
         `/files/${file._id}`
       );
+
+      // Send email notification to file creator
+      try {
+        await emailService.sendFileCompletedEmail(populatedFile.createdBy, {
+          fileTitle: file.title,
+          department: populatedFile.department.name,
+          completedBy: req.user.name,
+          fileId: file._id
+        });
+      } catch (emailError) {
+        console.error(`Error sending completion email:`, emailError.message);
+      }
     } catch (notifError) {
       console.error('Error creating notifications:', notifError);
     }

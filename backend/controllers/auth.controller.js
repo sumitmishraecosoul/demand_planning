@@ -93,7 +93,9 @@ exports.login = async (req, res) => {
     // Find user
     const user = await User.findOne({ email })
       .populate('department')
-      .populate('accessibleDepartments');
+      .populate('accessibleDepartments')
+      .populate('departmentAssignments.department')
+      .populate('departmentAssignments.level');
 
     if (!user) {
       return res.status(401).json({ 
@@ -141,7 +143,8 @@ exports.login = async (req, res) => {
         department: user.department,
         level: user.level,
         designation: user.designation,
-        accessibleDepartments: user.accessibleDepartments
+        accessibleDepartments: user.accessibleDepartments,
+        departmentAssignments: user.departmentAssignments
       }
     });
   } catch (error) {
@@ -223,7 +226,9 @@ exports.refreshToken = async (req, res) => {
     // Find user
     const user = await User.findById(decoded.userId)
       .populate('department')
-      .populate('accessibleDepartments');
+      .populate('accessibleDepartments')
+      .populate('departmentAssignments.department')
+      .populate('departmentAssignments.level');
 
     if (!user || !user.isActive) {
       return res.status(401).json({ 
@@ -256,7 +261,8 @@ exports.refreshToken = async (req, res) => {
         department: user.department,
         level: user.level,
         designation: user.designation,
-        accessibleDepartments: user.accessibleDepartments
+        accessibleDepartments: user.accessibleDepartments,
+        departmentAssignments: user.departmentAssignments
       }
     });
   } catch (error) {

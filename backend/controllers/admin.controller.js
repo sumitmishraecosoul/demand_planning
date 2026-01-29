@@ -564,3 +564,65 @@ exports.fixBrokenFiles = async (req, res) => {
     });
   }
 };
+
+// Delete department
+exports.deleteDepartment = async (req, res) => {
+  try {
+    const { departmentId } = req.params;
+    const File = require('../models/File.model');
+    const Workflow = require('../models/Workflow.model');
+
+    const department = await Department.findById(departmentId);
+
+    if (!department) {
+      return res.status(404).json({
+        success: false,
+        message: 'Department not found.'
+      });
+    }
+
+    // Check if there are any files in this department
+    const filesCount = await File.countDocuments({ department: departmentId });
+    
+    if (filesCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete department. There are ${filesCount} files associated with this department. Please delete or reassign all files first.`
+      });
+    }
+
+    // Delete all levels in this department
+    const deletedLevels = await Level.deleteMany({ department: departmentId });
+
+    // Delete all users in this department (or mark as inactive)
+    await User.updateMany(
+      { department: departmentId },
+      { isActive: false }
+    );
+
+    // Remove department from directors' accessible departments
+    await User.updateMany(
+      { 'departmentAssignments.department': departmentId },
+      { $pull: { departmentAssignments: { department: departmentId } } }
+    );
+
+    // Delete the department
+    await Department.findByIdAndDelete(departmentId);
+
+    res.json({
+      success: true,
+      message: 'Department deleted successfully.',
+      deleted: {
+        levels: deletedLevels.deletedCount,
+        department: 1
+      }
+    });
+  } catch (error) {
+    console.error('Delete department error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting department.',
+      error: error.message
+    });
+  }
+};
