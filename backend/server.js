@@ -10,14 +10,30 @@ dotenv.config();
 
 const app = express();
 
+// Dynamic CORS configuration based on environment
 const allowedOrigins = [
   'http://localhost:3000',
   'http://192.168.50.29:3000',
-  'http://49.249.157.19:3000'
+  'http://49.249.157.19:3000',
+  process.env.FRONTEND_URL, // From .env file
 ];
+
+// Remove undefined values and duplicates
+const filteredOrigins = [...new Set(allowedOrigins.filter(Boolean))];
+
 // Middleware
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (filteredOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('❌ CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
