@@ -10,9 +10,14 @@ dotenv.config();
 
 const app = express();
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://192.168.50.29:3000',
+  'http://49.249.157.19:3000'
+];
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());
