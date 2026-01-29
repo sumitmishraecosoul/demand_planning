@@ -16,7 +16,7 @@ export const config = {
   },
   
   // API URL
-  apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+  apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/api',
 };
 
 export default config;
