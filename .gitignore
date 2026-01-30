@@ -45,4 +45,6 @@ coverage/
 DEPLOYMENT_GUIDE.md
 QUICK_DEPLOY_COMMANDS.md
 MAC_STUDIO_SETUP.txt
+DOMAIN_SETUP_GUIDE.md
+QUICK_DOMAIN_SETUP.txt
 backend/.env.production.example

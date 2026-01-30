@@ -1,7 +1,37 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/api';
+// Smart API URL Detection with Priority:
+// 1. Use .env variable if set (for production domain)
+// 2. Auto-detect for development (localhost vs network IP)
+const getAPIUrl = () => {
+  // PRIORITY 1: If .env is set, always use it (production/domain setup)
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  // PRIORITY 2: Auto-detection for development
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    
+    // If accessing via domain (not IP, not localhost), use relative path
+    if (hostname.includes('.') && !hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+      // Domain detected (e.g., demandplanning.thrivebrands.ai)
+      // Use same domain with /api path (Nginx will proxy)
+      return `${window.location.protocol}//${hostname}/api`;
+    }
+    
+    // If accessing via network IP (192.168.x.x), use that IP with port
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `http://${hostname}:5002/api`;
+    }
+  }
+  
+  // PRIORITY 3: Default fallback for localhost
+  return 'http://localhost:5002/api';
+};
+
+const API_URL = getAPIUrl();
 
 export const api = axios.create({
   baseURL: API_URL,
