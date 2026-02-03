@@ -1,75 +1,79 @@
-const { Client } = require('@microsoft/microsoft-graph-client');
-const { ClientSecretCredential } = require('@azure/identity');
+const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 class EmailService {
   constructor() {
-    this.tenantId = process.env.TENANT_ID;
-    this.clientId = process.env.CLIENT_ID;
-    this.clientSecret = process.env.CLIENT_SECRET;
-    this.organizerEmail = process.env.ORGANIZER_EMAIL;
+    this.apiKey = process.env.BREVO_API_KEY;
+    this.senderEmail = process.env.BREVO_SENDER_EMAIL;
+    this.senderName = process.env.BREVO_SENDER_NAME || 'Demand Planning System';
     this.frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     
-    // Initialize the Microsoft Graph client
-    this.client = null;
+    // Initialize the Brevo client
+    this.apiInstance = null;
     this.initializeClient();
   }
 
   initializeClient() {
     try {
-      const credential = new ClientSecretCredential(
-        this.tenantId,
-        this.clientId,
-        this.clientSecret
-      );
+      if (!this.apiKey) {
+        console.warn('⚠️ BREVO_API_KEY not configured. Email notifications will be disabled.');
+        return;
+      }
 
-      this.client = Client.initWithMiddleware({
-        authProvider: {
-          getAccessToken: async () => {
-            const tokenResponse = await credential.getToken('https://graph.microsoft.com/.default');
-            return tokenResponse.token;
-          },
-        },
-      });
+      if (!this.senderEmail) {
+        console.warn('⚠️ BREVO_SENDER_EMAIL not configured. Email notifications will be disabled.');
+        return;
+      }
 
-      console.log('✅ Email service initialized successfully');
+      // Configure API key authorization
+      const defaultClient = SibApiV3Sdk.ApiClient.instance;
+      const apiKey = defaultClient.authentications['api-key'];
+      apiKey.apiKey = this.apiKey;
+
+      // Create TransactionalEmailsApi instance
+      this.apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+
+      console.log('✅ Brevo email service initialized successfully');
     } catch (error) {
-      console.error('❌ Error initializing email service:', error);
+      console.error('❌ Error initializing Brevo email service:', error);
     }
   }
 
-  async sendEmail(to, subject, htmlBody) {
-    if (!this.client) {
-      console.error('Email client not initialized');
+  async sendEmail(to, subject, htmlBody, recipientName = '') {
+    if (!this.apiInstance) {
+      console.warn('⚠️ Email service not initialized. Skipping email notification.');
       return false;
     }
 
     try {
-      const message = {
-        message: {
-          subject: subject,
-          body: {
-            contentType: 'HTML',
-            content: htmlBody,
-          },
-          toRecipients: [
-            {
-              emailAddress: {
-                address: to,
-              },
-            },
-          ],
-        },
-        saveToSentItems: true,
+      // Create email object
+      const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+      
+      // Set sender
+      sendSmtpEmail.sender = {
+        name: this.senderName,
+        email: this.senderEmail
       };
 
-      await this.client
-        .api(`/users/${this.organizerEmail}/sendMail`)
-        .post(message);
+      // Set recipient
+      sendSmtpEmail.to = [{
+        email: to,
+        name: recipientName || to.split('@')[0]
+      }];
 
-      console.log(`✅ Email sent successfully to ${to}`);
+      // Set subject and content
+      sendSmtpEmail.subject = subject;
+      sendSmtpEmail.htmlContent = htmlBody;
+
+      // Send the email
+      const result = await this.apiInstance.sendTransacEmail(sendSmtpEmail);
+
+      console.log(`✅ Email sent successfully to ${to} (Message ID: ${result.messageId})`);
       return true;
     } catch (error) {
       console.error('❌ Error sending email:', error.message);
+      if (error.response) {
+        console.error('Response:', error.response.text);
+      }
       return false;
     }
   }
@@ -250,7 +254,7 @@ class EmailService {
       ...data,
     });
 
-    return await this.sendEmail(recipient.email, subject, htmlBody);
+    return await this.sendEmail(recipient.email, subject, htmlBody, recipient.name);
   }
 
   // Send file rejected notification
@@ -261,7 +265,7 @@ class EmailService {
       ...data,
     });
 
-    return await this.sendEmail(recipient.email, subject, htmlBody);
+    return await this.sendEmail(recipient.email, subject, htmlBody, recipient.name);
   }
 
   // Send file completed notification
@@ -272,7 +276,7 @@ class EmailService {
       ...data,
     });
 
-    return await this.sendEmail(recipient.email, subject, htmlBody);
+    return await this.sendEmail(recipient.email, subject, htmlBody, recipient.name);
   }
 }
 
