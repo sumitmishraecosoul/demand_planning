@@ -3,10 +3,12 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface User {
   id: string;
+  _id?: string; // MongoDB ID (same as id)
   name: string;
   email: string;
   role: 'admin' | 'director' | 'user';
   department?: any;
+  departmentAssignments?: any[]; // For directors with multiple departments
   level?: number;
   designation?: string;
   accessibleDepartments?: any[];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -12,7 +12,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import toast from 'react-hot-toast';
 import { FiEye, FiDownload, FiActivity, FiPlus, FiTrash2 } from 'react-icons/fi';
 
-export default function FilesPage() {
+function FilesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
@@ -294,5 +294,21 @@ export default function FilesPage() {
         </div>
       </Layout>
     </ProtectedRoute>
+  );
+}
+
+export default function FilesPage() {
+  return (
+    <Suspense fallback={
+      <Layout>
+        <div className="space-y-4">
+          <FileCardShimmer />
+          <FileCardShimmer />
+          <FileCardShimmer />
+        </div>
+      </Layout>
+    }>
+      <FilesContent />
+    </Suspense>
   );
 }

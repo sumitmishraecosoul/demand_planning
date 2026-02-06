@@ -65,7 +65,7 @@ export default function FilePreview({ file, onClose, onDownload }: FilePreviewPr
                 }
                 setLoading(false);
               },
-              error: (error) => {
+              error: (error: any) => {
                 setError(`Error parsing CSV: ${error.message}`);
                 setLoading(false);
               }
