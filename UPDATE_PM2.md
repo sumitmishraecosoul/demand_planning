@@ -1,7 +1,9 @@
 # 🚀 Update PM2 Configuration on Mac Studio
 
 ## What Changed?
-- Added `env_file` to `ecosystem.config.js` to load `.env` files
+- Added `cwd` (current working directory) to both backend and frontend configs
+- Added `env_file` to load `.env` files correctly
+- Changed to `fork` mode for better environment variable loading
 - This fixes the MongoDB and Brevo API key errors
 
 ## Steps to Deploy on Mac Studio

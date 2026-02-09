@@ -2,7 +2,9 @@ module.exports = {
   apps: [
     {
       name: 'demand-planning-backend',
-      script: './backend/server.js',
+      script: 'server.js',  // Relative to cwd
+      cwd: './backend',     // ⭐ Set working directory to backend folder
+      exec_mode: 'fork',    // Use fork mode (not cluster) for better env loading
       instances: 1,
       autorestart: true,
       watch: false,
@@ -11,17 +13,18 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 5002,
       },
-      env_file: './backend/.env', // ⭐ Load environment variables from .env
-      error_file: './logs/backend-error.log',
-      out_file: './logs/backend-out.log',
-      log_file: './logs/backend-combined.log',
+      env_file: '.env',     // ⭐ Now relative to ./backend/
+      error_file: '../logs/backend-error.log',  // Relative to backend/
+      out_file: '../logs/backend-out.log',
+      log_file: '../logs/backend-combined.log',
       time: true,
     },
     {
       name: 'demand-planning-frontend',
       script: 'npm',
       args: 'start',
-      cwd: './frontend',
+      cwd: './frontend',    // ⭐ Working directory is frontend folder
+      exec_mode: 'fork',
       instances: 1,
       autorestart: true,
       watch: false,
@@ -30,10 +33,10 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
       },
-      env_file: './frontend/.env.local', // Load frontend environment variables
-      error_file: './logs/frontend-error.log',
-      out_file: './logs/frontend-out.log',
-      log_file: './logs/frontend-combined.log',
+      env_file: '.env.local',  // ⭐ Now relative to ./frontend/
+      error_file: '../logs/frontend-error.log',  // Relative to frontend/
+      out_file: '../logs/frontend-out.log',
+      log_file: '../logs/frontend-combined.log',
       time: true,
     },
   ],
