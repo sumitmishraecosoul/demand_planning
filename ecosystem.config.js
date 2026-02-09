@@ -11,6 +11,7 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 5002,
       },
+      env_file: './backend/.env', // ⭐ Load environment variables from .env
       error_file: './logs/backend-error.log',
       out_file: './logs/backend-out.log',
       log_file: './logs/backend-combined.log',
@@ -29,6 +30,7 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
       },
+      env_file: './frontend/.env.local', // Load frontend environment variables
       error_file: './logs/frontend-error.log',
       out_file: './logs/frontend-out.log',
       log_file: './logs/frontend-combined.log',
