@@ -10,7 +10,7 @@
 ### Step 2: Create .env file (Backend)
 Create `backend/.env`:
 ```env
-PORT=5000
+PORT=5002
 MONGODB_URI=mongodb://localhost:27017/datahive
 JWT_SECRET=datahive_secret_key_2026_change_in_production
 NODE_ENV=development
@@ -34,7 +34,7 @@ NODE_ENV=development
 
 **Option B: Via API**
 ```bash
-curl -X POST http://localhost:5000/api/auth/register \
+curl -X POST http://localhost:5002/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Admin User",

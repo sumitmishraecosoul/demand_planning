@@ -15,6 +15,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://192.168.50.29:3000',
   'http://49.249.157.19:3000',
+  'https://demand-planning.ecosoulhometech.com',
   process.env.FRONTEND_URL, // From .env file
 ];
 

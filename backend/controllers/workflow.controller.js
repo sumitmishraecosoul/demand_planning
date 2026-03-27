@@ -130,6 +130,13 @@ exports.passToNextLevel = async (req, res) => {
     // Create notifications for all assigned handlers
     try {
       const nextLevelName = nextLevel.levelName || `Level ${nextLevel.levelNumber}`;
+      
+      // 🔍 Log for debugging: Show which users will receive notifications
+      console.log(`📧 Sending notifications for file "${file.title}":`);
+      console.log(`   From: ${req.user.name} (${req.user.email})`);
+      console.log(`   To Level: ${nextLevelName}`);
+      console.log(`   Selected Handlers (${handlerIds.length}):`, handlers.map(h => `${h.name} (${h.email})`));
+      
       await createBulkNotifications(
         handlerIds,
         req.user._id,
@@ -150,10 +157,12 @@ exports.passToNextLevel = async (req, res) => {
             assignedBy: req.user.name,
             fileId: file._id
           });
+          console.log(`   ✅ Email sent to: ${handler.name} (${handler.email})`);
         } catch (emailError) {
-          console.error(`Error sending email to ${handler.email}:`, emailError.message);
+          console.error(`   ❌ Error sending email to ${handler.email}:`, emailError.message);
         }
       }
+      console.log(`📧 Notification process complete for "${file.title}"\n`);
     } catch (notifError) {
       console.error('Error creating notifications:', notifError);
     }
@@ -589,6 +598,13 @@ exports.passToSameLevel = async (req, res) => {
     // Create notifications for assigned same-level handlers
     try {
       const levelName = level.levelName || `Level ${level.levelNumber}`;
+      
+      // 🔍 Log for debugging: Show which users will receive notifications
+      console.log(`📧 Passing file "${file.title}" to same level:`);
+      console.log(`   From: ${req.user.name} (${req.user.email})`);
+      console.log(`   Level: ${levelName}`);
+      console.log(`   Selected Handlers (${handlerIds.length}):`, handlers.map(h => `${h.name} (${h.email})`));
+      
       await createBulkNotifications(
         handlerIds,
         req.user._id,
@@ -609,10 +625,12 @@ exports.passToSameLevel = async (req, res) => {
             assignedBy: req.user.name,
             fileId: file._id
           });
+          console.log(`   ✅ Email sent to: ${handler.name} (${handler.email})`);
         } catch (emailError) {
-          console.error(`Error sending email to ${handler.email}:`, emailError.message);
+          console.error(`   ❌ Error sending email to ${handler.email}:`, emailError.message);
         }
       }
+      console.log(`📧 Same-level pass complete for "${file.title}"\n`);
     } catch (notifError) {
       console.error('Error creating notifications:', notifError);
     }
